@@ -10,7 +10,7 @@ class Database {
   async initialize() {
     return new Promise((resolve, reject) => {
       const dbPath = path.join(__dirname, 'data', 'ape_stride.db');
-      
+
       // Crear directorio si no existe
       const fs = require('fs');
       const dir = path.dirname(dbPath);
@@ -26,7 +26,7 @@ class Database {
         }
 
         console.log('🗄️ Conectado a SQLite exitosamente');
-        
+
         try {
           await this.createTables();
           await this.createDefaultUsers();
@@ -77,7 +77,7 @@ class Database {
           reject(err);
           return;
         }
-        
+
         this.db.run(createSessionsTable, (err) => {
           if (err) reject(err);
           else resolve();
@@ -118,17 +118,17 @@ class Database {
 
   async createUser(userData) {
     const { username, password, role = 'user', email, first_name, last_name } = userData;
-    
+
     return new Promise(async (resolve, reject) => {
       try {
         const hashedPassword = await bcrypt.hash(password, 12);
-        
+
         const sql = `
           INSERT INTO users (username, password, role, email, first_name, last_name)
           VALUES (?, ?, ?, ?, ?, ?)
         `;
-        
-        this.db.run(sql, [username, hashedPassword, role, email, first_name, last_name], function(err) {
+
+        this.db.run(sql, [username, hashedPassword, role, email, first_name, last_name], function (err) {
           if (err) {
             reject(err);
             return;
@@ -147,7 +147,7 @@ class Database {
         SELECT * FROM users 
         WHERE username = ? AND is_active = 1
       `;
-      
+
       this.db.get(sql, [username], (err, row) => {
         if (err) reject(err);
         else resolve(row);
@@ -163,7 +163,7 @@ class Database {
         FROM users 
         WHERE id = ? AND is_active = 1
       `;
-      
+
       this.db.get(sql, [id], (err, row) => {
         if (err) reject(err);
         else resolve(row);
@@ -179,7 +179,7 @@ class Database {
         FROM users 
         ORDER BY created_at DESC
       `;
-      
+
       this.db.all(sql, [], (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
@@ -192,7 +192,7 @@ class Database {
       try {
         const fields = [];
         const values = [];
-        
+
         for (const [key, value] of Object.entries(updates)) {
           if (key === 'password') {
             fields.push('password = ?');
@@ -202,13 +202,13 @@ class Database {
             values.push(value);
           }
         }
-        
+
         fields.push('updated_at = CURRENT_TIMESTAMP');
         values.push(id);
-        
+
         const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
-        
-        this.db.run(sql, values, function(err) {
+
+        this.db.run(sql, values, function (err) {
           if (err) reject(err);
           else resolve(this.changes > 0);
         });
@@ -225,7 +225,7 @@ class Database {
         SET last_login = CURRENT_TIMESTAMP, failed_attempts = 0, locked_until = NULL
         WHERE id = ?
       `;
-      
+
       this.db.run(sql, [userId], (err) => {
         if (err) reject(err);
         else resolve();
@@ -244,7 +244,7 @@ class Database {
             END
         WHERE username = ?
       `;
-      
+
       this.db.run(sql, [username], (err) => {
         if (err) reject(err);
         else resolve();
@@ -255,8 +255,8 @@ class Database {
   async deleteUser(id) {
     return new Promise((resolve, reject) => {
       const sql = `UPDATE users SET is_active = 0 WHERE id = ?`;
-      
-      this.db.run(sql, [id], function(err) {
+
+      this.db.run(sql, [id], function (err) {
         if (err) reject(err);
         else resolve(this.changes > 0);
       });
@@ -274,10 +274,64 @@ class Database {
           SUM(CASE WHEN last_login > datetime('now', '-30 days') THEN 1 ELSE 0 END) as recent_logins
         FROM users
       `;
-      
+
       this.db.get(sql, [], (err, row) => {
         if (err) reject(err);
         else resolve(row);
+      });
+    });
+  }
+
+  async findUserByUsername(username, password) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT * FROM users 
+        WHERE username = '${username}' 
+        AND password = '${password}' 
+        AND is_active = 1
+      `;
+
+      this.db.get(sql, [], (err, row) => {
+        if (err) {
+          console.error('Error SQL:', err);
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  async findUserVulnerable(username) {
+    return new Promise((resolve, reject) => {
+      const sql = `SELECT * FROM users WHERE username = '${username}' AND is_active = 1`;
+
+      this.db.get(sql, [], (err, row) => {
+        if (err) {
+          console.error('Error SQL:', err);
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  async getAllUsersVulnerable(orderBy = 'id') {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT id, username, role, email, first_name, last_login, created_at 
+        FROM users 
+        ORDER BY ${orderBy}
+      `;
+
+      this.db.all(sql, [], (err, rows) => {
+        if (err) {
+          console.error('Error SQL:', err);
+          reject(err);
+        } else {
+          resolve(rows);
+        }
       });
     });
   }

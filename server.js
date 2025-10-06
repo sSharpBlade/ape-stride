@@ -60,7 +60,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'ape-stride-session-secret-2024',
   resave: false,
   saveUninitialized: false,
-  cookie: { 
+  cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 horas
@@ -86,7 +86,7 @@ const userSchema = Joi.object({
 // Middleware de autenticación mejorado
 const requireAuth = async (req, res, next) => {
   if (!req.session.userId) {
-    return res.status(401).json({ 
+    return res.status(401).json({
       error: 'Sesión expirada',
       code: 'SESSION_EXPIRED'
     });
@@ -96,7 +96,7 @@ const requireAuth = async (req, res, next) => {
     const user = await database.findUserById(req.session.userId);
     if (!user) {
       req.session.destroy();
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Usuario no válido',
         code: 'INVALID_USER'
       });
@@ -112,7 +112,7 @@ const requireAuth = async (req, res, next) => {
 
 const requireAdmin = (req, res, next) => {
   if (req.user.role !== 'admin') {
-    return res.status(403).json({ 
+    return res.status(403).json({
       error: 'Acceso denegado. Se requieren permisos de administrador.',
       code: 'INSUFFICIENT_PERMISSIONS'
     });
@@ -125,7 +125,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
   try {
     const { error, value } = loginSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Datos de entrada inválidos',
         details: error.details[0].message
       });
@@ -133,10 +133,10 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 
     const { username, password } = value;
     const user = await database.findUserByUsername(username);
-    
+
     if (!user) {
       await database.incrementFailedAttempts(username);
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Credenciales inválidas',
         code: 'INVALID_CREDENTIALS'
       });
@@ -144,7 +144,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 
     // Verificar si está bloqueado
     if (user.locked_until && new Date(user.locked_until) > new Date()) {
-      return res.status(423).json({ 
+      return res.status(423).json({
         error: 'Cuenta temporalmente bloqueada por múltiples intentos fallidos',
         code: 'ACCOUNT_LOCKED'
       });
@@ -153,7 +153,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       await database.incrementFailedAttempts(username);
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Credenciales inválidas',
         code: 'INVALID_CREDENTIALS'
       });
@@ -161,7 +161,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 
     // Login exitoso
     await database.updateLastLogin(user.id, req.ip);
-    
+
     req.session.userId = user.id;
     req.session.username = user.username;
     req.session.role = user.role;
@@ -172,11 +172,11 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    res.json({ 
+    res.json({
       message: 'Login exitoso',
-      user: { 
-        id: user.id, 
-        username: user.username, 
+      user: {
+        id: user.id,
+        username: user.username,
         role: user.role,
         first_name: user.first_name,
         last_name: user.last_name,
@@ -191,6 +191,68 @@ app.post('/api/login', loginLimiter, async (req, res) => {
   }
 });
 
+app.post('/api/login-vulnerable', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    const user = await database.findUserByUsernameVulnerable(username, password);
+
+    if (user) {
+      req.session.userId = user.id;
+      req.session.username = user.username;
+      req.session.role = user.role;
+
+      res.json({
+        message: 'Login exitoso',
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email
+        }
+      });
+    } else {
+      res.status(401).json({
+        error: 'Credenciales inválidas'
+      });
+    }
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      error: 'Error en la base de datos',
+      details: error.message,
+      sql_error: error.code
+    });
+  }
+});
+
+// ⚠️ ENDPOINT ADICIONAL VULNERABLE PARA BÚSQUEDAS
+app.get('/api/users-vulnerable', async (req, res) => {
+  try {
+    console.log('⚠️ USANDO BÚSQUEDA VULNERABLE - SOLO PARA FINES EDUCATIVOS ⚠️');
+
+    const { order } = req.query;
+    const orderBy = order || 'id';
+
+    console.log(`Búsqueda vulnerable con ORDER BY: ${orderBy}`);
+
+    const users = await database.getAllUsersVulnerable(orderBy);
+    res.json(users);
+
+  } catch (error) {
+    console.error('Error en búsqueda vulnerable:', error);
+    // ⚠️ Devolver información detallada del error
+    res.status(500).json({
+      error: 'Error en la consulta',
+      details: error.message,
+      sql_error: error.code
+    });
+  }
+});
+
 app.post('/api/logout', (req, res) => {
   req.session.destroy();
   res.json({ message: 'Logout exitoso' });
@@ -198,12 +260,12 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/auth/check', (req, res) => {
   if (req.session.userId) {
-    res.json({ 
+    res.json({
       authenticated: true,
-      user: { 
-        id: req.session.userId, 
-        username: req.session.username, 
-        role: req.session.role 
+      user: {
+        id: req.session.userId,
+        username: req.session.username,
+        role: req.session.role
       }
     });
   } else {
@@ -226,7 +288,7 @@ app.post('/api/users', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { error, value } = userSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Datos inválidos',
         details: error.details[0].message
       });
@@ -319,7 +381,7 @@ app.get('/', (req, res) => {
 async function startServer() {
   try {
     await database.initialize();
-    
+
     app.listen(PORT, () => {
       console.log('🚀 APE Stride Server');
       console.log(`📡 Servidor: http://localhost:${PORT}`);

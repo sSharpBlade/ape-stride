@@ -13,33 +13,66 @@ class EnterpriseApp {
 
     setupEventListeners() {
         // Login
-        document.getElementById('loginForm').addEventListener('submit', (e) => this.handleLogin(e));
-        
-        // Logout
-        document.getElementById('logoutBtn').addEventListener('click', () => this.handleLogout());
-        
-        // User management
-        document.getElementById('addUserBtn').addEventListener('click', () => this.openUserModal());
-        document.getElementById('userForm').addEventListener('submit', (e) => this.handleUserSubmit(e));
-        document.getElementById('closeModal').addEventListener('click', () => this.closeUserModal());
-        document.getElementById('cancelBtn').addEventListener('click', () => this.closeUserModal());
-        
-        // Search and filters
-        document.getElementById('searchUsers').addEventListener('input', (e) => this.filterUsers());
-        document.getElementById('filterRole').addEventListener('change', (e) => this.filterUsers());
-        
-        // Modal events
-        document.getElementById('userModal').addEventListener('click', (e) => {
-            if (e.target.id === 'userModal') {
-                this.closeUserModal();
-            }
-        });
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+        }
+
+        // Logout (solo se ejecuta cuando el elemento existe)
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => this.handleLogout());
+        }
+
+        // User management (solo se ejecuta cuando los elementos existen)
+        const addUserBtn = document.getElementById('addUserBtn');
+        if (addUserBtn) {
+            addUserBtn.addEventListener('click', () => this.openUserModal());
+        }
+
+        const userForm = document.getElementById('userForm');
+        if (userForm) {
+            userForm.addEventListener('submit', (e) => this.handleUserSubmit(e));
+        }
+
+        const closeModal = document.getElementById('closeModal');
+        if (closeModal) {
+            closeModal.addEventListener('click', () => this.closeUserModal());
+        }
+
+        const cancelBtn = document.getElementById('cancelBtn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this.closeUserModal());
+        }
+
+        // Search and filters (solo se ejecuta cuando los elementos existen)
+        const searchUsers = document.getElementById('searchUsers');
+        if (searchUsers) {
+            searchUsers.addEventListener('input', (e) => this.filterUsers());
+        }
+
+        const filterRole = document.getElementById('filterRole');
+        if (filterRole) {
+            filterRole.addEventListener('change', (e) => this.filterUsers());
+        }
+
+        // Modal events (solo se ejecuta cuando el elemento existe)
+        const userModal = document.getElementById('userModal');
+        if (userModal) {
+            userModal.addEventListener('click', (e) => {
+                if (e.target.id === 'userModal') {
+                    this.closeUserModal();
+                }
+            });
+        }
 
         // Remember me functionality
         const rememberedUser = localStorage.getItem('rememberedUser');
         if (rememberedUser) {
-            document.getElementById('username').value = rememberedUser;
-            document.getElementById('rememberMe').checked = true;
+            const usernameField = document.getElementById('username');
+            const rememberMeField = document.getElementById('rememberMe');
+            if (usernameField) usernameField.value = rememberedUser;
+            if (rememberMeField) rememberMeField.checked = true;
         }
     }
 
@@ -49,10 +82,10 @@ class EnterpriseApp {
 
     async checkAuth() {
         this.showLoading(true);
-        
+
         try {
             const response = await this.apiCall('/api/auth/check');
-            
+
             if (response.authenticated) {
                 this.currentUser = response.user;
                 this.showApp();
@@ -78,7 +111,7 @@ class EnterpriseApp {
         };
 
         const response = await fetch(endpoint, config);
-        
+
         if (response.status === 401) {
             this.handleSessionExpired();
             throw new Error('Session expired');
@@ -89,7 +122,7 @@ class EnterpriseApp {
         }
 
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
@@ -99,29 +132,34 @@ class EnterpriseApp {
 
     async handleLogin(e) {
         e.preventDefault();
-        
-        const username = document.getElementById('username').value.trim();
-        const password = document.getElementById('password').value;
-        const rememberMe = document.getElementById('rememberMe').checked;
+
+        const usernameField = document.getElementById('username');
+        const passwordField = document.getElementById('password');
+        const rememberMeField = document.getElementById('rememberMe');
         const loginBtn = document.getElementById('loginBtn');
         const errorDiv = document.getElementById('loginError');
         const successDiv = document.getElementById('loginSuccess');
-        
+
+        // Verificar que los elementos existan
+        if (!usernameField || !passwordField || !loginBtn || !errorDiv || !successDiv) {
+            console.error('Error: No se encontraron todos los elementos necesarios del formulario de login');
+            return;
+        }
+
+        const username = usernameField.value.trim();
+        const password = passwordField.value;
+        const rememberMe = rememberMeField ? rememberMeField.checked : false;
+
         // Reset messages
         errorDiv.style.display = 'none';
         successDiv.style.display = 'none';
-        
-        // Validate input
-        if (!username || !password) {
-            this.showError('Por favor complete todos los campos');
-            return;
-        }
 
         try {
             loginBtn.disabled = true;
             loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando sesión...';
-            
-            const data = await this.apiCall('/api/login', {
+
+            // Usar siempre el endpoint vulnerable por defecto
+            const data = await this.apiCall('/api/login-vulnerable', {
                 method: 'POST',
                 body: JSON.stringify({ username, password })
             });
@@ -140,10 +178,10 @@ class EnterpriseApp {
             }
 
             this.currentUser = data.user;
-            
+
             successDiv.textContent = '¡Login exitoso! Redirigiendo...';
             successDiv.style.display = 'block';
-            
+
             setTimeout(() => {
                 this.showApp();
                 this.loadDashboardData();
@@ -164,7 +202,7 @@ class EnterpriseApp {
             'SESSION_EXPIRED': 'Su sesión ha expirado. Por favor inicie sesión nuevamente',
             'INSUFFICIENT_PERMISSIONS': 'No tiene permisos para realizar esta acción'
         };
-        
+
         return errorMessages[errorMsg] || errorMsg || 'Error desconocido';
     }
 
@@ -172,7 +210,7 @@ class EnterpriseApp {
         const errorDiv = document.getElementById('loginError');
         errorDiv.textContent = message;
         errorDiv.style.display = 'block';
-        
+
         // Auto-hide after 5 seconds
         setTimeout(() => {
             errorDiv.style.display = 'none';
@@ -209,12 +247,12 @@ class EnterpriseApp {
     showApp() {
         document.getElementById('loginContainer').style.display = 'none';
         document.getElementById('appContainer').style.display = 'flex';
-        
+
         // Update user info
         const fullName = `${this.currentUser.first_name} ${this.currentUser.last_name}`;
         document.getElementById('currentUserName').textContent = fullName;
         document.getElementById('currentUserRole').textContent = this.currentUser.role === 'admin' ? 'Administrador' : 'Usuario';
-        
+
         // Show/hide admin features
         const isAdmin = this.currentUser.role === 'admin';
         document.getElementById('addUserBtn').style.display = isAdmin ? 'inline-flex' : 'none';
@@ -244,13 +282,13 @@ class EnterpriseApp {
     renderUsers(users) {
         const tbody = document.getElementById('usersTableBody');
         tbody.innerHTML = '';
-        
+
         users.forEach(user => {
             const row = document.createElement('tr');
             const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
             const lastLogin = user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Nunca';
             const isAdmin = this.currentUser.role === 'admin';
-            
+
             row.innerHTML = `
                 <td>${user.id}</td>
                 <td>${user.username}</td>
@@ -279,7 +317,7 @@ class EnterpriseApp {
         const modal = document.getElementById('userModal');
         const title = document.getElementById('modalTitle');
         const form = document.getElementById('userForm');
-        
+
         if (userId) {
             title.textContent = 'Editar Usuario';
             // En un caso real, cargarías los datos del usuario
@@ -287,7 +325,7 @@ class EnterpriseApp {
             title.textContent = 'Nuevo Usuario';
             form.reset();
         }
-        
+
         modal.style.display = 'block';
     }
 
@@ -299,13 +337,13 @@ class EnterpriseApp {
 
     async handleUserSubmit(e) {
         e.preventDefault();
-        
+
         const username = document.getElementById('userUsername').value;
         const password = document.getElementById('userPassword').value;
         const role = document.getElementById('userRole').value;
-        
+
         const userData = { username, password, role };
-        
+
         try {
             let response;
             if (this.editingUserId) {
@@ -325,7 +363,7 @@ class EnterpriseApp {
                     body: JSON.stringify(userData),
                 });
             }
-            
+
             if (response.ok) {
                 this.closeUserModal();
                 this.loadUsers();
@@ -350,7 +388,7 @@ class EnterpriseApp {
                 const response = await fetch(`/api/users/${userId}`, {
                     method: 'DELETE',
                 });
-                
+
                 if (response.ok) {
                     this.loadUsers();
                 } else {
@@ -375,9 +413,9 @@ class EnterpriseApp {
             const email = row.cells[3].textContent.toLowerCase();
             const role = row.cells[4].textContent.toLowerCase();
 
-            const matchesSearch = username.includes(searchTerm) || 
-                                fullName.includes(searchTerm) || 
-                                email.includes(searchTerm);
+            const matchesSearch = username.includes(searchTerm) ||
+                fullName.includes(searchTerm) ||
+                email.includes(searchTerm);
             const matchesRole = !roleFilter || role.includes(roleFilter);
 
             row.style.display = matchesSearch && matchesRole ? '' : 'none';
@@ -389,7 +427,7 @@ class EnterpriseApp {
 function togglePassword() {
     const passwordInput = document.getElementById('password');
     const toggleBtn = document.querySelector('.toggle-password i');
-    
+
     if (passwordInput.type === 'password') {
         passwordInput.type = 'text';
         toggleBtn.className = 'fas fa-eye-slash';
